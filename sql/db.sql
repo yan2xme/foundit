@@ -1,10 +1,7 @@
 
 DROP DATABASE IF EXISTS foundit_db;
 CREATE DATABASE foundit_db
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
 USE foundit_db;
-
 
 CREATE TABLE User (
     user_id        INT          NOT NULL AUTO_INCREMENT,
@@ -154,8 +151,6 @@ INSERT INTO Location (location_id, location_name) VALUES
 (6, 'Computer Laboratory 2');
 
 
-
-
 INSERT INTO User (user_id, first_name, last_name, email, contact_number, user_type) VALUES
 (1,  'AJ',       'Castro',     'aj.castro@addu.edu.ph',     '09171234501',   'Reporter'),
 (2,  'Jose',     'Ramirez',    'jose.ramirez@addu.edu.ph',     '09171234502',   'Reporter'),
@@ -169,7 +164,6 @@ INSERT INTO User (user_id, first_name, last_name, email, contact_number, user_ty
 (10, 'Ramon',    'Aquino',     'ramon.aquino@addu.edu.ph',     '09191234510',   'Validator'),
 (11, 'Stephanie',   'Domingo',    'stephanie.domingo@addu.edu.ph',   '09191234511',   'Validator'),
 (12, 'Anika',    'Fernandez',  'anika.fernandez@addu.edu.ph',  '+639191234512', 'Validator');
-
 
 
 INSERT INTO Reporter  (user_id) VALUES (1), (2), (3), (4);
