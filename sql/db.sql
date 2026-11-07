@@ -1,6 +1,6 @@
 
 DROP DATABASE IF EXISTS foundit_db;
-CREATE DATABASE foundit_db
+CREATE DATABASE foundit_db;
 USE foundit_db;
 
 CREATE TABLE User (
