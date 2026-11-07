@@ -1,0 +1,457 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>4-311G2W4</title><style>
+@page { size: A4; margin: 15mm 13mm 15mm 13mm; }
+@page wide { size: A4 landscape; margin: 12mm 12mm 12mm 12mm; }
+.wide-section { page: wide; }
+* { box-sizing: border-box; }
+body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+       font-size: 10.5pt; line-height: 1.5; color: #1b1b1b; margin: 0; }
+h1 { font-size: 21pt; margin: 0 0 2mm; letter-spacing: -0.3px; }
+h2 { font-size: 14pt; margin: 0 0 4mm; padding-bottom: 2mm;
+     border-bottom: 2px solid #1b4f86; color: #1b4f86; }
+h3 { font-size: 11pt; margin: 7mm 0 2mm; color: #14375f; }
+.sub { color: #555; font-size: 10pt; margin: 0 0 1mm; }
+.rule { height: 3px; background: #1b4f86; margin: 4mm 0 6mm; }
+.section { page-break-before: always; }
+table { width: 100%; border-collapse: collapse; margin: 3mm 0 5mm; font-size: 9.5pt; }
+th { background: #1b4f86; color: #fff; text-align: left; padding: 2mm 2.5mm; font-weight: 600; }
+td { padding: 2mm 2.5mm; border-bottom: 1px solid #dcdcdc; vertical-align: top; }
+td.num { width: 8mm; text-align: center; color: #666; }
+td.feat { width: 52mm; font-family: "SF Mono", Menlo, monospace; font-size: 8.5pt; color: #14375f; }
+tr:nth-child(even) td { background: #f7f9fb; }
+pre { font-family: "SF Mono", Menlo, monospace; line-height: 1.4;
+      background: #f6f7f9; border: 1px solid #dcdcdc; border-radius: 3px;
+      padding: 2.5mm; margin: 1.5mm 0 3mm; white-space: pre-wrap; overflow-wrap: anywhere;
+      font-size: 7.8pt; }
+pre.sql { background: #eef4fb; border-left: 3px solid #1b4f86; font-size: 7.6pt; }
+pre.console { background: #fbfbf6; border-left: 3px solid #8a8a8a; }
+section.query { page-break-inside: avoid; margin-bottom: 4mm; }
+.caption { margin: 0; font-size: 8.5pt; color: #666; }
+.ok { color: #17692f; font-weight: 600; }
+.warn { color: #a3590a; font-weight: 600; }
+.note { background: #fff8e6; border: 1px solid #e8d9a8; border-radius: 3px;
+        padding: 3mm; font-size: 9pt; margin: 4mm 0; }
+ul { margin: 2mm 0 4mm; padding-left: 5mm; }
+li { margin-bottom: 1mm; }
+code { font-family: "SF Mono", Menlo, monospace; font-size: 8.6pt; background: #f0f1f3;
+       padding: 0.5mm 1.2mm; border-radius: 2px; }
+</style></head><body>
+
+<h1>FoundIt &mdash; Lost and Found System</h1>
+<p class="sub">Week 4: Queries and Full System Integration</p>
+<p class="sub">Class Code <strong>4-311</strong> &nbsp;&middot;&nbsp; Group <strong>2</strong> &nbsp;&middot;&nbsp; 7 November 2026</p>
+<div class="rule"></div>
+
+<section>
+<h2>1. Query Summary</h2>
+<p>Eight information-retrieval queries are exposed from the Java console application under
+<strong>Main Menu &rarr; 5. Reports / queries</strong>. Each one is implemented as a
+<code>PreparedStatement</code> in <code>QueryMenu.java</code>.</p>
+<table>
+<thead><tr><th>#</th><th>Business Question</th><th>SQL Feature</th></tr></thead>
+<tbody>
+<tr><td class='num'>1</td><td>Which items belong to a given category?</td><td class='feat'>WHERE</td></tr>
+<tr><td class='num'>2</td><td>Where was each item found or lost, and who reported it?</td><td class='feat'>JOIN</td></tr>
+<tr><td class='num'>3</td><td>How many items has each reporter submitted?</td><td class='feat'>JOIN + COUNT + GROUP BY</td></tr>
+<tr><td class='num'>4</td><td>Which found items have never been claimed?</td><td class='feat'>Subquery</td></tr>
+<tr><td class='num'>5</td><td>How many claims has each validator verified versus rejected?</td><td class='feat'>JOIN + SUM + GROUP BY</td></tr>
+<tr><td class='num'>6</td><td>Which items have more than one claim request filed against them?</td><td class='feat'>GROUP BY + HAVING</td></tr>
+<tr><td class='num'>7</td><td>What are the five most recently found items?</td><td class='feat'>ORDER BY</td></tr>
+<tr><td class='num'>8</td><td>How long does it take, on average, from found to claim, per category?</td><td class='feat'>AVG + GROUP BY</td></tr>
+</tbody></table>
+<p class="caption">Table 1. Query list, business question, and the SQL feature demonstrated.</p>
+</section>
+
+<section class="section wide-section">
+<h2>2. SQL and Query Results</h2>
+<p>Every query below was executed through the Java menu against the <code>foundit_db</code>
+database. The monospace blocks are the console output produced by the application.</p>
+
+    <section class="query">
+      <h3>Query 1 &mdash; Items in a category (WHERE)</h3>
+      <pre class="sql">SELECT item_id, item_name, item_category, item_type FROM Item WHERE item_category = ?</pre>
+      <p class="caption">Result <span class='ok'>rows returned</span></p>
+      <pre class="console" style="font-size:8.4pt">item_id                     item_name                   item_category               item_type                   
+----------------------------------------------------------------------------------------------------------------
+3                           Scientific Calculator       Electronics                 FoundItem                   
+5                           Wireless Earbuds Case       Electronics                 FoundItem                   
+10                          Laptop Charger              Electronics                 LostItem                    </pre>
+    </section>
+
+    <section class="query">
+      <h3>Query 2 &mdash; Items with location and reporter (JOIN)</h3>
+      <pre class="sql">SELECT i.item_id, i.item_name, i.item_type, l.location_name, CONCAT(u.first_name,&#x27; &#x27;,u.last_name) AS reporter FROM Item i JOIN Location l ON l.location_id = i.location_id JOIN User u ON u.user_id = i.reporter_id ORDER BY i.item_id</pre>
+      <p class="caption">Result <span class='ok'>rows returned</span></p>
+      <pre class="console" style="font-size:8.4pt">item_id                     item_name                   item_type                   location_name               reporter                    
+--------------------------------------------------------------------------------------------------------------------------------------------
+1                           Black Umbrella              FoundItem                   University Canteen          AJ Castro                   
+2                           Blue Tumbler                FoundItem                   Gisbert Library             Jose Ramirez                
+3                           Scientific Calculator       FoundItem                   Finster Hall Lobby          Angela Reyes                
+4                           Student ID with Lanyard     FoundItem                   Main Gate Guardhouse        AJ Castro                   
+5                           Wireless Earbuds Case       FoundItem                   Computer Laboratory 2       Paolo Contis                
+6                           Gray Hoodie                 FoundItem                   Covered Court               Jose Ramirez                
+7                           Brown Leather Wallet        FoundItem                   University Canteen          Angela Reyes                
+8                           House Keys                  FoundItem                   Finster Hall Lobby          Paolo Contis                
+9                           Black Backpack              LostItem                    Gisbert Library             AJ Castro                   
+10                          Laptop Charger              LostItem                    Computer Laboratory 2       Jose Ramirez                
+11                          Eyeglasses                  LostItem                    Covered Court               Angela Reyes                
+12                          Blue Spiral Notebook        LostItem                    Finster Hall Lobby          Paolo Contis                </pre>
+    </section>
+
+    <section class="query">
+      <h3>Query 3 &mdash; Items reported per reporter (JOIN + COUNT + GROUP BY)</h3>
+      <pre class="sql">SELECT u.user_id, CONCAT(u.first_name,&#x27; &#x27;,u.last_name) AS reporter, COUNT(i.item_id) AS items_reported FROM User u JOIN Item i ON i.reporter_id = u.user_id GROUP BY u.user_id, u.first_name, u.last_name ORDER BY items_reported DESC</pre>
+      <p class="caption">Result <span class='ok'>rows returned</span></p>
+      <pre class="console" style="font-size:8.4pt">user_id                     reporter                    items_reported              
+------------------------------------------------------------------------------------
+1                           AJ Castro                   3                           
+2                           Jose Ramirez                3                           
+3                           Angela Reyes                3                           
+4                           Paolo Contis                3                           </pre>
+    </section>
+
+    <section class="query">
+      <h3>Query 4 &mdash; Found items never claimed (Subquery)</h3>
+      <pre class="sql">SELECT i.item_id, i.item_name, f.found_at FROM Item i JOIN FoundItem f ON f.item_id = i.item_id WHERE i.item_id NOT IN (SELECT item_id FROM ClaimRequest)</pre>
+      <p class="caption">Result <span class='warn'>0 rows</span></p>
+      <pre class="console" style="font-size:8.4pt">item_id                     item_name                   found_at                    
+------------------------------------------------------------------------------------
+(no results)</pre>
+    </section>
+
+    <section class="query">
+      <h3>Query 5 &mdash; Verified/unverified claims per validator (JOIN + SUM + GROUP BY)</h3>
+      <pre class="sql">SELECT u.user_id, CONCAT(u.first_name,&#x27; &#x27;,u.last_name) AS validator, SUM(c.request_type = &#x27;VerifiedRequest&#x27;) AS verified, SUM(c.request_type = &#x27;UnverifiedRequest&#x27;) AS unverified FROM ClaimRequest c JOIN User u ON u.user_id = c.validator_id GROUP BY u.user_id, u.first_name, u.last_name</pre>
+      <p class="caption">Result <span class='ok'>rows returned</span></p>
+      <pre class="console" style="font-size:8.4pt">user_id                     validator                   verified                    unverified                  
+----------------------------------------------------------------------------------------------------------------
+10                          Ramon Aquino                2                           1                           
+11                          Stephanie Domingo           2                           2                           
+12                          Anika Fernandez             1                           2                           </pre>
+    </section>
+
+    <section class="query">
+      <h3>Query 6 &mdash; Items with more than one claim (GROUP BY + HAVING)</h3>
+      <pre class="sql">SELECT i.item_id, i.item_name, COUNT(*) AS claim_count FROM ClaimRequest c JOIN Item i ON i.item_id = c.item_id GROUP BY i.item_id, i.item_name HAVING COUNT(*) &gt; 1</pre>
+      <p class="caption">Result <span class='ok'>rows returned</span></p>
+      <pre class="console" style="font-size:8.4pt">item_id                     item_name                   claim_count                 
+------------------------------------------------------------------------------------
+2                           Blue Tumbler                2                           
+6                           Gray Hoodie                 2                           </pre>
+    </section>
+
+    <section class="query">
+      <h3>Query 7 &mdash; Five most recently found items (ORDER BY)</h3>
+      <pre class="sql">SELECT i.item_id, i.item_name, f.found_at FROM FoundItem f JOIN Item i ON i.item_id = f.item_id ORDER BY f.found_at DESC LIMIT 5</pre>
+      <p class="caption">Result <span class='ok'>rows returned</span></p>
+      <pre class="console" style="font-size:8.4pt">item_id                     item_name                   found_at                    
+------------------------------------------------------------------------------------
+8                           House Keys                  2026-10-05 09:30:00         
+7                           Brown Leather Wallet        2026-10-01 13:15:00         
+6                           Gray Hoodie                 2026-09-23 18:00:00         
+5                           Wireless Earbuds Case       2026-09-21 16:20:00         
+4                           Student ID with Lanyard     2026-09-18 07:45:00         </pre>
+    </section>
+
+    <section class="query">
+      <h3>Query 8 &mdash; Average hours from found to claim, per category (AVG + GROUP BY)</h3>
+      <pre class="sql">SELECT i.item_category, ROUND(AVG(TIMESTAMPDIFF(HOUR, f.found_at, c.request_date)),1) AS avg_hours_to_claim FROM ClaimRequest c JOIN FoundItem f ON f.item_id = c.item_id JOIN Item i ON i.item_id = c.item_id GROUP BY i.item_category ORDER BY avg_hours_to_claim</pre>
+      <p class="caption">Result <span class='ok'>rows returned</span></p>
+      <pre class="console" style="font-size:8.4pt">item_category               avg_hours_to_claim          
+--------------------------------------------------------
+Drinkware                   11.0                        
+Umbrella                    20.0                        
+Wallet/Bags                 20.0                        
+Electronics                 22.0                        
+ID/Documents                24.0                        
+Keys                        24.0                        
+Clothing                    175.0                       </pre>
+    </section>
+</section>
+
+<section class="section">
+<h2>3. Java Implementation</h2>
+
+<h3>3.1 Application structure</h3>
+<table>
+<thead><tr><th>Class</th><th>Responsibility</th></tr></thead>
+<tbody>
+<tr><td><code>Foundit</code></td><td>Entry point and main menu; dispatches to each menu class</td></tr>
+<tr><td><code>Database</code></td><td>Prompts for the password, opens the connection, rolls back failed transactions</td></tr>
+<tr><td><code>Console</code></td><td>Shared prompt/parse helpers (<code>readLine</code>, <code>readInt</code>, <code>readChoice</code>)</td></tr>
+<tr><td><code>ViewMenu</code></td><td>Lists rows of User, Location, Item, ClaimRequest, ItemPhoto</td></tr>
+<tr><td><code>InsertMenu</code></td><td>Inserts, writing parent and child tables in one transaction</td></tr>
+<tr><td><code>UpdateMenu</code></td><td>Updates location, item, user contact, rejection reason</td></tr>
+<tr><td><code>DeleteMenu</code></td><td>Deletes child rows first, then the parent row</td></tr>
+<tr><td><code>QueryMenu</code></td><td>The eight report queries in Table 1</td></tr>
+</tbody></table>
+
+<h3>3.2 Main menu</h3>
+<pre class="sql">private static void runMainMenu(Connection conn, Console console) {
+        boolean running = true;
+
+        while (running) {
+            System.out.println(&quot;\n===== FoundIt Lost and Found System =====&quot;);
+            System.out.println(&quot;1. View records&quot;);
+            System.out.println(&quot;2. Insert record&quot;);
+            System.out.println(&quot;3. Update record&quot;);
+            System.out.println(&quot;4. Delete record&quot;);
+            System.out.println(&quot;5. Reports / queries&quot;);
+            System.out.println(&quot;6. Exit&quot;);
+
+            try {
+                conn.setAutoCommit(true);
+
+                switch (console.readChoice(&quot;Choose: &quot;)) {
+                    case 1 -&gt; new ViewMenu(conn, console).run();
+                    case 2 -&gt; new InsertMenu(conn, console).run();
+                    case 3 -&gt; new UpdateMenu(conn, console).run();
+                    case 4 -&gt; new DeleteMenu(conn, console).run();
+                    case 5 -&gt; new QueryMenu(conn, console).run();
+                    case 6 -&gt; {
+                        System.out.println(&quot;Goodbye!&quot;);
+                        running = false;
+                    }
+                    default -&gt; System.out.println(&quot;Invalid choice. Please enter 1-6.&quot;);
+                }
+            } catch (SQLException e) {
+                System.out.println(&quot;Error: &quot; + e.getMessage());
+                Database.rollbackIfNeeded(conn);
+            } catch (NumberFormatException e) {
+                System.out.println(&quot;Invalid number. Please enter digits only.&quot;);
+            } catch (IllegalArgumentException e) {
+                System.out.println(&quot;Invalid date. Use the format yyyy-MM-dd HH:mm:ss&quot;);
+            }
+        }
+    }</pre>
+<p class="caption">Foundit.java &mdash; reports are reached through menu option 5.</p>
+
+<h3>3.3 Query implementation</h3>
+<pre class="sql">public void run() {
+        while (true) {
+            System.out.println(&quot;\n===== REPORTS / QUERIES =====&quot;);
+            for (int i = 0; i &lt; TITLES.length; i++) {
+                System.out.printf(&quot;%d. %s%n&quot;, i + 1, TITLES[i]);
+            }
+            System.out.println(&quot;0. Back to main menu&quot;);
+
+            int choice;
+            try {
+                choice = Integer.parseInt(console.readLine(&quot;Choose: &quot;));
+            } catch (NumberFormatException e) {
+                System.out.println(&quot;Invalid input. Enter a number from 0 to &quot; + TITLES.length + &quot;.&quot;);
+                continue;
+            }
+
+            if (choice == 0) {
+                return;
+            }
+            if (choice &lt; 1 || choice &gt; TITLES.length) {
+                System.out.println(&quot;Invalid choice. Enter a number from 0 to &quot; + TITLES.length + &quot;.&quot;);
+                continue;
+            }
+            runQuery(choice - 1);
+        }
+    }
+
+    private void runQuery(int idx) {
+        try (PreparedStatement ps = conn.prepareStatement(SQL[idx])) {
+            if (idx == 0) {
+                String category = console.readLine(&quot;Category (e.g. Electronics, Clothing, Keys): &quot;);
+                if (category.isEmpty()) {
+                    System.out.println(&quot;Category cannot be empty.&quot;);
+                    return;
+                }
+                ps.setString(1, category);
+            }
+
+            try (ResultSet rs = ps.executeQuery()) {
+                System.out.println(&quot;\n-- &quot; + TITLES[idx] + &quot; --&quot;);
+                print(rs);
+            }
+        } catch (SQLException e) {
+            System.out.println(&quot;Database error: &quot; + e.getMessage());
+        }
+    }
+
+    private void print(ResultSet rs) throws SQLException {
+        ResultSetMetaData md = rs.getMetaData();
+        int cols = md.getColumnCount();
+
+        StringBuilder header = new StringBuilder();
+        for (int c = 1; c &lt;= cols; c++) {
+            header.append(String.format(&quot;%-28s&quot;, md.getColumnLabel(c)));
+        }
+        System.out.println(header);
+        System.out.println(&quot;-&quot;.repeat(header.length()));
+
+        int rows = 0;
+        while (rs.next()) {
+            StringBuilder line = new StringBuilder();
+            for (int c = 1; c &lt;= cols; c++) {
+                String value = rs.getString(c);
+                line.append(String.format(&quot;%-28s&quot;, value == null ? &quot;NULL&quot; : value));
+            }
+            System.out.println(line);
+            rows++;
+        }
+        if (rows == 0) {
+            System.out.println(&quot;(no results)&quot;);
+        }
+    }</pre>
+<p class="caption">QueryMenu.java &mdash; <code>run</code> selects a query, <code>runQuery</code> binds the
+single parameter and executes it, <code>print</code> renders the <code>ResultSet</code> with aligned columns.</p>
+
+<div class="note">
+<strong>Error handling.</strong> All statements are prepared, so user input never reaches the SQL text.
+Database failures are caught and reported (<code>Database error: &lt;message&gt;</code>); multi-table
+writes roll back on failure (<code>Changes were rolled back.</code>); invalid menu input, non-numeric
+IDs, and malformed dates each print a specific message instead of terminating the program.
+</div>
+</section>
+
+<section class="section">
+<h2>Appendix A &mdash; QueryMenu.java (full source)</h2>
+<pre class="sql">package com.mycompany.foundit;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+
+/**
+ * Runs the canned report queries.
+ */
+public final class QueryMenu {
+
+    private static final String[] TITLES = {
+        &quot;Items in a category (WHERE)&quot;,
+        &quot;Items with location and reporter (JOIN)&quot;,
+        &quot;Items reported per reporter (JOIN + COUNT + GROUP BY)&quot;,
+        &quot;Found items never claimed (Subquery)&quot;,
+        &quot;Verified/unverified claims per validator (JOIN + SUM + GROUP BY)&quot;,
+        &quot;Items with more than one claim (GROUP BY + HAVING)&quot;,
+        &quot;Five most recently found items (ORDER BY)&quot;,
+        &quot;Average hours from found to claim, per category (AVG + GROUP BY)&quot;
+    };
+
+    private static final String[] SQL = {
+        &quot;SELECT item_id, item_name, item_category, item_type FROM Item WHERE item_category = ?&quot;,
+
+        &quot;SELECT i.item_id, i.item_name, i.item_type, l.location_name, &quot;
+      + &quot;CONCAT(u.first_name,&#x27; &#x27;,u.last_name) AS reporter &quot;
+      + &quot;FROM Item i JOIN Location l ON l.location_id = i.location_id &quot;
+      + &quot;JOIN User u ON u.user_id = i.reporter_id ORDER BY i.item_id&quot;,
+
+        &quot;SELECT u.user_id, CONCAT(u.first_name,&#x27; &#x27;,u.last_name) AS reporter, COUNT(i.item_id) AS items_reported &quot;
+      + &quot;FROM User u JOIN Item i ON i.reporter_id = u.user_id &quot;
+      + &quot;GROUP BY u.user_id, u.first_name, u.last_name ORDER BY items_reported DESC&quot;,
+
+        &quot;SELECT i.item_id, i.item_name, f.found_at FROM Item i &quot;
+      + &quot;JOIN FoundItem f ON f.item_id = i.item_id &quot;
+      + &quot;WHERE i.item_id NOT IN (SELECT item_id FROM ClaimRequest)&quot;,
+
+        &quot;SELECT u.user_id, CONCAT(u.first_name,&#x27; &#x27;,u.last_name) AS validator, &quot;
+      + &quot;SUM(c.request_type = &#x27;VerifiedRequest&#x27;) AS verified, &quot;
+      + &quot;SUM(c.request_type = &#x27;UnverifiedRequest&#x27;) AS unverified &quot;
+      + &quot;FROM ClaimRequest c JOIN User u ON u.user_id = c.validator_id &quot;
+      + &quot;GROUP BY u.user_id, u.first_name, u.last_name&quot;,
+
+        &quot;SELECT i.item_id, i.item_name, COUNT(*) AS claim_count &quot;
+      + &quot;FROM ClaimRequest c JOIN Item i ON i.item_id = c.item_id &quot;
+      + &quot;GROUP BY i.item_id, i.item_name HAVING COUNT(*) &gt; 1&quot;,
+
+        &quot;SELECT i.item_id, i.item_name, f.found_at FROM FoundItem f &quot;
+      + &quot;JOIN Item i ON i.item_id = f.item_id ORDER BY f.found_at DESC LIMIT 5&quot;,
+
+        &quot;SELECT i.item_category, ROUND(AVG(TIMESTAMPDIFF(HOUR, f.found_at, c.request_date)),1) AS avg_hours_to_claim &quot;
+      + &quot;FROM ClaimRequest c JOIN FoundItem f ON f.item_id = c.item_id &quot;
+      + &quot;JOIN Item i ON i.item_id = c.item_id GROUP BY i.item_category ORDER BY avg_hours_to_claim&quot;
+    };
+
+    private final Connection conn;
+    private final Console console;
+
+    public QueryMenu(Connection conn, Console console) {
+        this.conn = conn;
+        this.console = console;
+    }
+
+    public void run() {
+        while (true) {
+            System.out.println(&quot;\n===== REPORTS / QUERIES =====&quot;);
+            for (int i = 0; i &lt; TITLES.length; i++) {
+                System.out.printf(&quot;%d. %s%n&quot;, i + 1, TITLES[i]);
+            }
+            System.out.println(&quot;0. Back to main menu&quot;);
+
+            int choice;
+            try {
+                choice = Integer.parseInt(console.readLine(&quot;Choose: &quot;));
+            } catch (NumberFormatException e) {
+                System.out.println(&quot;Invalid input. Enter a number from 0 to &quot; + TITLES.length + &quot;.&quot;);
+                continue;
+            }
+
+            if (choice == 0) {
+                return;
+            }
+            if (choice &lt; 1 || choice &gt; TITLES.length) {
+                System.out.println(&quot;Invalid choice. Enter a number from 0 to &quot; + TITLES.length + &quot;.&quot;);
+                continue;
+            }
+            runQuery(choice - 1);
+        }
+    }
+
+    private void runQuery(int idx) {
+        try (PreparedStatement ps = conn.prepareStatement(SQL[idx])) {
+            if (idx == 0) {
+                String category = console.readLine(&quot;Category (e.g. Electronics, Clothing, Keys): &quot;);
+                if (category.isEmpty()) {
+                    System.out.println(&quot;Category cannot be empty.&quot;);
+                    return;
+                }
+                ps.setString(1, category);
+            }
+
+            try (ResultSet rs = ps.executeQuery()) {
+                System.out.println(&quot;\n-- &quot; + TITLES[idx] + &quot; --&quot;);
+                print(rs);
+            }
+        } catch (SQLException e) {
+            System.out.println(&quot;Database error: &quot; + e.getMessage());
+        }
+    }
+
+    private void print(ResultSet rs) throws SQLException {
+        ResultSetMetaData md = rs.getMetaData();
+        int cols = md.getColumnCount();
+
+        StringBuilder header = new StringBuilder();
+        for (int c = 1; c &lt;= cols; c++) {
+            header.append(String.format(&quot;%-28s&quot;, md.getColumnLabel(c)));
+        }
+        System.out.println(header);
+        System.out.println(&quot;-&quot;.repeat(header.length()));
+
+        int rows = 0;
+        while (rs.next()) {
+            StringBuilder line = new StringBuilder();
+            for (int c = 1; c &lt;= cols; c++) {
+                String value = rs.getString(c);
+                line.append(String.format(&quot;%-28s&quot;, value == null ? &quot;NULL&quot; : value));
+            }
+            System.out.println(line);
+            rows++;
+        }
+        if (rows == 0) {
+            System.out.println(&quot;(no results)&quot;);
+        }
+    }
+}
+</pre>
+</section>
+
+</body></html>

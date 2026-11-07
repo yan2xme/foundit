@@ -1,9 +1,15 @@
 package com.mycompany.foundit;
 
-import java.sql.*;
-import java.util.Scanner;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 
-public class QueryMenu {
+/**
+ * Runs the canned report queries.
+ */
+public final class QueryMenu {
 
     private static final String[] TITLES = {
         "Items in a category (WHERE)",
@@ -49,54 +55,53 @@ public class QueryMenu {
       + "FROM ClaimRequest c JOIN FoundItem f ON f.item_id = c.item_id "
       + "JOIN Item i ON i.item_id = c.item_id GROUP BY i.item_category ORDER BY avg_hours_to_claim"
     };
-    public static void main(String[] args) {
-        String url  = "jdbc:mysql://localhost:3306/foundit_db";
-        String user = "root";
-        String pass = "root";
 
-        try (Connection con = DriverManager.getConnection(url, user, pass);
-             Scanner in = new Scanner(System.in)) {
-            run(con, in);
-        } catch (SQLException e) {
-            System.out.println("Could not connect to the database: " + e.getMessage());
-        }
+    private final Connection conn;
+    private final Console console;
+
+    public QueryMenu(Connection conn, Console console) {
+        this.conn = conn;
+        this.console = console;
     }
-    public static void run(Connection con, Scanner in) {
+
+    public void run() {
         while (true) {
             System.out.println("\n===== REPORTS / QUERIES =====");
             for (int i = 0; i < TITLES.length; i++) {
                 System.out.printf("%d. %s%n", i + 1, TITLES[i]);
             }
             System.out.println("0. Back to main menu");
-            System.out.print("Choose: ");
 
             int choice;
             try {
-                choice = Integer.parseInt(in.nextLine().trim());
+                choice = Integer.parseInt(console.readLine("Choose: "));
             } catch (NumberFormatException e) {
                 System.out.println("Invalid input. Enter a number from 0 to " + TITLES.length + ".");
                 continue;
             }
-            if (choice == 0) return;
+
+            if (choice == 0) {
+                return;
+            }
             if (choice < 1 || choice > TITLES.length) {
                 System.out.println("Invalid choice. Enter a number from 0 to " + TITLES.length + ".");
                 continue;
             }
-            runQuery(con, in, choice - 1);
+            runQuery(choice - 1);
         }
     }
 
-    private static void runQuery(Connection con, Scanner in, int idx) {
-        try (PreparedStatement ps = con.prepareStatement(SQL[idx])) {
+    private void runQuery(int idx) {
+        try (PreparedStatement ps = conn.prepareStatement(SQL[idx])) {
             if (idx == 0) {
-                System.out.print("Category (e.g. Electronics, Clothing, Keys): ");
-                String cat = in.nextLine().trim();
-                if (cat.isEmpty()) {
+                String category = console.readLine("Category (e.g. Electronics, Clothing, Keys): ");
+                if (category.isEmpty()) {
                     System.out.println("Category cannot be empty.");
                     return;
                 }
-                ps.setString(1, cat);
+                ps.setString(1, category);
             }
+
             try (ResultSet rs = ps.executeQuery()) {
                 System.out.println("\n-- " + TITLES[idx] + " --");
                 print(rs);
@@ -106,25 +111,29 @@ public class QueryMenu {
         }
     }
 
-    private static void print(ResultSet rs) throws SQLException {
+    private void print(ResultSet rs) throws SQLException {
         ResultSetMetaData md = rs.getMetaData();
         int cols = md.getColumnCount();
+
         StringBuilder header = new StringBuilder();
         for (int c = 1; c <= cols; c++) {
             header.append(String.format("%-28s", md.getColumnLabel(c)));
         }
         System.out.println(header);
         System.out.println("-".repeat(header.length()));
+
         int rows = 0;
         while (rs.next()) {
             StringBuilder line = new StringBuilder();
             for (int c = 1; c <= cols; c++) {
-                String v = rs.getString(c);
-                line.append(String.format("%-28s", v == null ? "NULL" : v));
+                String value = rs.getString(c);
+                line.append(String.format("%-28s", value == null ? "NULL" : value));
             }
             System.out.println(line);
             rows++;
         }
-        if (rows == 0) System.out.println("(no results)");
+        if (rows == 0) {
+            System.out.println("(no results)");
+        }
     }
 }
